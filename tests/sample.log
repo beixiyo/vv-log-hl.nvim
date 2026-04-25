@@ -1,0 +1,47 @@
+2026-04-24 08:00:01 [INFO]     Server starting on port 3000
+2026-04-24 08:00:01 [INFO]     Loading configuration from /etc/app/config.yaml
+2026-04-24 08:00:02 [DEBUG]    Parsed 42 config entries
+2026-04-24 08:00:02 [TRACE]    db.pool init min=2 max=10
+2026-04-24 08:00:02 [VERBOSE]  routes registered: /api/v1/*
+2026-04-24 08:00:03 [INFO]     Connected to postgres at db.internal:5432
+2026-04-24 08:00:03 [PASS]     health check ok
+2026-04-24 08:00:03 [OK]       migrations up to date (rev 20260421_add_index)
+2026-04-24 08:00:04 [SUCCESS]  warm cache populated in 812ms
+2026-04-24 08:00:04 [DONE]     startup complete
+2026-04-24 08:00:04 [READY]    accepting connections
+
+2026-04-24 08:01:12 [NOTICE]   deprecation: /api/v1/users will be removed in v3
+2026-04-24 08:01:13 [WARN]     slow query detected: 1.2s on users.search
+2026-04-24 08:01:14 [WARNING]  connection pool at 80% capacity
+2026-04-24 08:01:15 [DBG]      retry backoff=250ms attempt=1
+2026-04-24 08:01:15 [DEBUG]    retry backoff=500ms attempt=2
+
+2026-04-24 08:02:00 [ERR]      timeout talking to redis.internal:6379
+2026-04-24 08:02:00 [ERROR]    Connection refused: upstream auth-service
+2026-04-24 08:02:01 [FAIL]     failed to renew session token for user_id=8831
+2026-04-24 08:02:01 [FAILED]   job=email-digest-456 retries exhausted
+2026-04-24 08:02:02 [FAILURE]  payment gateway returned HTTP 502
+
+2026-04-24 08:02:10 [CRIT]     disk usage 95% on /var/log
+2026-04-24 08:02:11 [CRITICAL] replica lag exceeds 60s threshold
+2026-04-24 08:02:12 [ALERT]    oncall paged: auth-service down
+2026-04-24 08:02:13 [EMERG]    kernel: out of memory killer invoked
+2026-04-24 08:02:13 [EMERGENCY] process supervisor lost leader election
+2026-04-24 08:02:14 [FATAL]    unrecoverable: corrupt WAL segment
+2026-04-24 08:02:14 [PANIC]    runtime error: nil map assignment (goroutine 47)
+
+2026-04-24 08:05:00 [INFO]     Reconnect attempt to redis succeeded
+2026-04-24 08:05:00 [PASS]     auth-service back online, latency=23ms
+2026-04-24 08:05:01 [DEBUG]    circuit breaker half-open -> closed
+2026-04-24 08:05:01 [INFO]     resumed job=email-digest-456
+2026-04-24 08:05:02 [PASSED]   post-recovery integration checks 12/12
+2026-04-24 08:05:02 [COMPLETE] incident auto-mitigation finished
+2026-04-24 08:05:03 [FINISHED] cleanup of stale sessions (n=217)
+
+INFO  mixed-case: Info / info / INFO should all match
+error: lower-case at start of line
+WARN some logs have no timestamp
+2026-04-24 08:10:00 request_id=abc123 user_id=42 path=/api/v1/orders status=200 ms=12
+2gg026-04-24 08:10:01 request_id=abc124 user_id=42 path=/api/v1/orders status=500 ms=892 ERROR upstream_timeout
+
+[MYERROR] custom keyword

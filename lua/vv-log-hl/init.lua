@@ -4,15 +4,20 @@
 local M = {}
 
 local ft = 'log'
+local config
+local rtp_added = false
+local enabled = false
+local color_group = 'VVLogHighlightColors'
+local badge_group = 'VVLogHighlightBadge'
 
----@class VVLogHighlight.Config
----@field extension? string|string[]
----@field filename? string|string[]
----@field pattern? string|string[]
----@field keyword? table<string, string|string[]>
----@field badge? boolean 是否启用圆角 badge 效果（默认 true）
+---@class VVLogHlConfig
+---@field extension? string|string[] @default 'log'
+---@field filename? string|string[] @default {}
+---@field pattern? string|string[] @default {}
+---@field keyword? table<string, string|string[]> @default { error = {}, warning = {}, info = {}, debug = {}, pass = {} }
+---@field badge? boolean 是否启用圆角 badge 效果 @default true
 
----@type VVLogHighlight.Config
+---@type VVLogHlConfig
 local defaults = {
   extension = ft,
   filename = {},
@@ -52,36 +57,73 @@ local function to_ft_table(values)
   return t
 end
 
---- Badge 风格的颜色定义（用 nvim_set_hl，不会被 colorscheme 覆盖）
-local badge_highlights = {
-  -- 等级：bg + 白色文字
-  VVLogLvFatal     = { fg = '#ffffff', bg = '#f7768e', bold = true },
-  VVLogLvEmergency = { fg = '#ffffff', bg = '#f7768e', bold = true },
-  VVLogLvAlert     = { fg = '#ffffff', bg = '#f7768e', bold = true },
-  VVLogLvCritical  = { fg = '#ffffff', bg = '#f7768e', bold = true },
-  VVLogLvError     = { fg = '#ffffff', bg = '#db4b4b', bold = true },
-  VVLogLvFail      = { fg = '#ffffff', bg = '#db4b4b', bold = true },
-  VVLogLvWarning   = { fg = '#ffffff', bg = '#e0af68', bold = true },
-  VVLogLvNotice    = { fg = '#ffffff', bg = '#ff9e64', bold = true },
-  VVLogLvInfo      = { fg = '#ffffff', bg = '#7aa2f7', bold = true },
-  VVLogLvDebug     = { fg = '#a9b1d6', bg = '#292e42' },
-  VVLogLvTrace     = { fg = '#a9b1d6', bg = '#292e42' },
-  VVLogLvVerbose   = { fg = '#a9b1d6', bg = '#292e42' },
-  VVLogLvPass      = { fg = '#ffffff', bg = '#9ece6a', bold = true },
-  VVLogLvSuccess   = { fg = '#ffffff', bg = '#9ece6a', bold = true },
-  -- 圆角 cap：fg = 等级 bg，无背景
-  VVLogCapFatal    = { fg = '#f7768e' },
-  VVLogCapError    = { fg = '#db4b4b' },
-  VVLogCapWarning  = { fg = '#e0af68' },
-  VVLogCapNotice   = { fg = '#ff9e64' },
-  VVLogCapInfo     = { fg = '#7aa2f7' },
-  VVLogCapDebug    = { fg = '#292e42' },
-  VVLogCapPass     = { fg = '#9ece6a' },
+local level_colors = {
+  fatal     = '#f7768e',
+  emergency = '#f7768e',
+  alert     = '#f7768e',
+  critical  = '#f7768e',
+  error     = '#db4b4b',
+  fail      = '#db4b4b',
+  warning   = '#e0af68',
+  notice    = '#ff9e64',
+  info      = '#7aa2f7',
+  debug     = '#636d83',
+  trace     = '#636d83',
+  verbose   = '#636d83',
+  pass      = '#9ece6a',
+  success   = '#9ece6a',
 }
 
---- 应用所有 badge 高亮组
+local syntax_colors = {
+  VVLogDate          = { fg = '#e0af68' },
+  VVLogWeekdayStr    = { fg = '#e0af68' },
+  VVLogTime          = { fg = '#ff9e64' },
+  VVLogTimeAMPM      = { fg = '#ff9e64' },
+  VVLogTimeZone      = { fg = '#ff9e64' },
+  VVLogDuration      = { fg = '#ff9e64' },
+  VVLogNumber         = { fg = '#d19a66' },
+  VVLogNumberFloat    = { fg = '#d19a66' },
+  VVLogNumberHex      = { fg = '#d19a66' },
+  VVLogString         = { fg = '#98c379' },
+  VVLogBool           = { fg = '#d19a66' },
+  VVLogNull           = { fg = '#d19a66' },
+  VVLogUrl            = { fg = '#7aa2f7', underline = true },
+  VVLogIPv4           = { fg = '#bb9af7' },
+  VVLogUUID           = { fg = '#bb9af7' },
+  VVLogPath           = { fg = '#7aa2f7' },
+  VVLogSymbol         = { fg = '#636d83' },
+  VVLogSeparatorLine  = { fg = '#636d83' },
+}
+
+local function build_highlights(use_badge)
+  local hls = vim.deepcopy(syntax_colors)
+  for level, color in pairs(level_colors) do
+    local name = 'VVLogLv' .. level:sub(1, 1):upper() .. level:sub(2)
+    local is_dim = (level == 'debug' or level == 'trace' or level == 'verbose')
+    if use_badge then
+      hls[name] = is_dim
+        and { fg = color, bg = '#292e42' }
+        or  { fg = '#ffffff', bg = color, bold = true }
+    else
+      hls[name] = is_dim
+        and { fg = color }
+        or  { fg = color, bold = true }
+    end
+  end
+  if use_badge then
+    hls.VVLogCapFatal   = { fg = level_colors.fatal }
+    hls.VVLogCapError   = { fg = level_colors.error }
+    hls.VVLogCapWarning = { fg = level_colors.warning }
+    hls.VVLogCapNotice  = { fg = level_colors.notice }
+    hls.VVLogCapInfo    = { fg = level_colors.info }
+    hls.VVLogCapDebug   = { fg = '#292e42' }
+    hls.VVLogCapPass    = { fg = level_colors.pass }
+  end
+  return hls
+end
+
 local function apply_highlights()
-  for name, hl in pairs(badge_highlights) do
+  for name, hl in pairs(build_highlights(config.badge)) do
     vim.api.nvim_set_hl(0, name, hl)
   end
 end
@@ -121,41 +163,84 @@ local function gen_syntax_file(keyword_table)
   file:write(table.concat(content))
   file:close()
 
-  if not M.rtp_added then
+  if not rtp_added then
     vim.opt.runtimepath:append(vim.fn.stdpath('data') .. '/log-highlight/after')
-    M.rtp_added = true
+    rtp_added = true
   end
 end
 
----@param opts? VVLogHighlight.Config
-function M.setup(opts)
-  M.config = vim.tbl_deep_extend('force', defaults, opts or {})
+function M.enable()
+  if enabled then return end
+  enabled = true
 
-  vim.filetype.add({
-    extension = to_ft_table(M.config.extension),
-    filename = to_ft_table(M.config.filename),
-    pattern = to_ft_table(M.config.pattern),
-  })
-
-  gen_syntax_file(M.config.keyword)
-
-  -- 应用颜色（立即 + colorscheme 切换后重新应用）
   apply_highlights()
   vim.api.nvim_create_autocmd('ColorScheme', {
-    group = vim.api.nvim_create_augroup('VVLogHighlightColors', { clear = true }),
+    group = vim.api.nvim_create_augroup(color_group, { clear = true }),
     callback = apply_highlights,
   })
 
-  if M.config.badge then
+  if config.badge then
     local badge = require('vv-log-hl.badge')
     vim.api.nvim_create_autocmd('FileType', {
       pattern = ft,
-      group = vim.api.nvim_create_augroup('VVLogHighlightBadge', { clear = true }),
+      group = vim.api.nvim_create_augroup(badge_group, { clear = true }),
       callback = function(ev)
         badge.attach(ev.buf)
       end,
     })
   end
+end
+
+function M.disable()
+  if not enabled then return end
+  enabled = false
+  vim.api.nvim_create_augroup(color_group, { clear = true })
+  vim.api.nvim_create_augroup(badge_group, { clear = true })
+end
+
+function M.toggle()
+  if enabled then
+    M.disable()
+  else
+    M.enable()
+  end
+end
+
+---@param opts? VVLogHlConfig
+function M.setup(opts)
+  config = vim.tbl_deep_extend('force', defaults, opts or {})
+
+  vim.filetype.add({
+    extension = to_ft_table(config.extension),
+    filename = to_ft_table(config.filename),
+    pattern = to_ft_table(config.pattern),
+  })
+
+  gen_syntax_file(config.keyword)
+  M.enable()
+
+  vim.api.nvim_create_user_command('VVLogHlEnable', function() M.enable() end, {})
+  vim.api.nvim_create_user_command('VVLogHlDisable', function() M.disable() end, {})
+  vim.api.nvim_create_user_command('VVLogHlToggle', function() M.toggle() end, {})
+
+  -- lazy load 时 filetype 检测已跑完，补刷已打开 buffer 的 filetype
+  for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+    if vim.api.nvim_buf_is_loaded(buf) and vim.bo[buf].filetype ~= ft then
+      local name = vim.api.nvim_buf_get_name(buf)
+      if name ~= '' then
+        local detected = vim.filetype.match({ buf = buf, filename = name })
+        if detected == ft then
+          vim.bo[buf].filetype = ft
+        end
+      end
+    end
+  end
+end
+
+---获取当前配置（只读副本）
+---@return VVLogHlConfig
+function M.get_config()
+  return vim.deepcopy(config)
 end
 
 return M

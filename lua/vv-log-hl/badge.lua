@@ -5,6 +5,13 @@ local M = {}
 
 local ns = vim.api.nvim_create_namespace('log_highlight_badge')
 
+--- 已 attach 的 buffer -> 代次 token；nil 表示未 attach。
+--- token 用于：1) 幂等保护（已 attach 则不再叠加 on_lines）；2) 让旧回调在
+--- detach 或被新一轮 attach 取代后，于下次触发时 return true 自解绑。
+---@type table<number, number>
+local attached = {}
+local gen = 0
+
 --- 关键词（全小写） -> cap 高亮组（大小写不敏感匹配）
 ---@type table<string, string>
 local keyword_to_cap = {}
@@ -107,19 +114,54 @@ end
 --- 启用 badge 装饰
 function M.attach(bufnr)
   bufnr = bufnr or vim.api.nvim_get_current_buf()
+  if not vim.api.nvim_buf_is_valid(bufnr) then return end
+
+  -- 幂等：已 attach 则只重绘，不再叠加新的 on_lines 回调（避免回调线性累积）
+  if attached[bufnr] then
+    decorate_buf(bufnr)
+    return
+  end
+
+  gen = gen + 1
+  local token = gen
+  attached[bufnr] = token
   decorate_buf(bufnr)
 
   vim.api.nvim_buf_attach(bufnr, false, {
     on_lines = function(_, buf, _, firstline, lastline, new_lastline)
+      -- 本回调已失效（被 detach 清除，或被新一轮 attach 的 token 取代）→ 解绑
+      if attached[buf] ~= token then return true end
       vim.schedule(function()
-        if not vim.api.nvim_buf_is_valid(buf) then return end
-        -- 清除变更范围内的旧装饰
-        vim.api.nvim_buf_clear_namespace(buf, ns, firstline, new_lastline)
-        -- 仅重新装饰变更行
-        decorate_range(buf, firstline, new_lastline)
+        if attached[buf] ~= token or not vim.api.nvim_buf_is_valid(buf) then return end
+        -- 收尾 badge 用 right_gravity=true，行增删时会漂移到变更区下一行（new_lastline），
+        -- 故清除+重绘范围须多含一行，否则会残留孤儿 badge 或漏绘被推移的关键词行
+        local hi = math.min(new_lastline + 1, vim.api.nvim_buf_line_count(buf))
+        vim.api.nvim_buf_clear_namespace(buf, ns, firstline, hi)
+        decorate_range(buf, firstline, hi)
       end)
     end,
+    on_detach = function(_, buf)
+      -- buffer 被删除时清表，避免泄漏（若已被新一轮 attach 占用则不动）
+      if attached[buf] == token then attached[buf] = nil end
+    end,
   })
+end
+
+--- 解除单个 buffer 的 badge：清除 extmark，并令其 on_lines 在下次触发时自解绑
+---@param bufnr? number
+function M.detach(bufnr)
+  bufnr = bufnr or vim.api.nvim_get_current_buf()
+  attached[bufnr] = nil
+  if vim.api.nvim_buf_is_valid(bufnr) then
+    vim.api.nvim_buf_clear_namespace(bufnr, ns, 0, -1)
+  end
+end
+
+--- 解除所有已 attach buffer 的 badge（供 disable 调用）
+function M.detach_all()
+  local bufs = {}
+  for buf in pairs(attached) do bufs[#bufs + 1] = buf end
+  for _, buf in ipairs(bufs) do M.detach(buf) end
 end
 
 return M

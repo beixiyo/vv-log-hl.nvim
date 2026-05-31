@@ -128,6 +128,14 @@ local function apply_highlights()
   end
 end
 
+--- 还原（清空）本插件定义的全部高亮组，使 syntax 着色随 disable 一并消失。
+--- 用 badge=true 版求并集（其高亮组是非 badge 版的超集），与当前 config.badge 无关。
+local function clear_highlights()
+  for name in pairs(build_highlights(true)) do
+    vim.api.nvim_set_hl(0, name, {})
+  end
+end
+
 --- 生成 after/syntax/log.vim 扩展自定义关键词
 ---@param keyword_table table<string, string|string[]>
 local function gen_syntax_file(keyword_table)
@@ -188,14 +196,28 @@ function M.enable()
         badge.attach(ev.buf)
       end,
     })
+
+    -- 对「已经是 ft=log 且已加载」的 buffer 主动 attach：FileType 早已触发过、
+    -- 不会再触发，故 disable→enable / 二次 toggle 后须主动回放，badge 才能恢复
+    for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+      if vim.api.nvim_buf_is_loaded(buf) and vim.bo[buf].filetype == ft then
+        badge.attach(buf)
+      end
+    end
   end
 end
 
 function M.disable()
   if not enabled then return end
   enabled = false
+
   vim.api.nvim_create_augroup(color_group, { clear = true })
   vim.api.nvim_create_augroup(badge_group, { clear = true })
+
+  -- 真正让高亮消失：1) 解除所有 log buffer 的 badge（清 extmark + 解绑 on_lines）；
+  -- 2) 清空高亮组定义，使 syntax 着色一并失色。enable 时 apply_highlights 再恢复。
+  require('vv-log-hl.badge').detach_all()
+  clear_highlights()
 end
 
 function M.toggle()

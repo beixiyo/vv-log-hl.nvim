@@ -247,7 +247,8 @@ function M.setup(opts)
 
   -- lazy load 时 filetype 检测已跑完，补刷已打开 buffer 的 filetype
   for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-    if vim.api.nvim_buf_is_loaded(buf) and vim.bo[buf].filetype ~= ft then
+    -- 跳过 vv-utils.bigfile 已标记的大文件：不把它强提成 log，保住 bigfile 关掉的重开销特性
+    if vim.api.nvim_buf_is_loaded(buf) and vim.bo[buf].filetype ~= ft and vim.bo[buf].filetype ~= 'bigfile' then
       local name = vim.api.nvim_buf_get_name(buf)
       if name ~= '' then
         local detected = vim.filetype.match({ buf = buf, filename = name })

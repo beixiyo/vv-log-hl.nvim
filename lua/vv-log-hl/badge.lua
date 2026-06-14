@@ -116,6 +116,10 @@ function M.attach(bufnr)
   bufnr = bufnr or vim.api.nvim_get_current_buf()
   if not vim.api.nvim_buf_is_valid(bufnr) then return end
 
+  -- 大文件保护：超大日志逐行扫描会卡住编辑器，交给 vv-utils.bigfile 统一判定后跳过
+  local ok_bf, bigfile = pcall(require, 'vv-utils.bigfile')
+  if ok_bf and bigfile.is_big(bufnr) then return end
+
   -- 幂等：已 attach 则只重绘，不再叠加新的 on_lines 回调（避免回调线性累积）
   if attached[bufnr] then
     decorate_buf(bufnr)

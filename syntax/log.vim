@@ -53,7 +53,7 @@ syn match VVLogPath       display     '\(^\|\s\|=\)\zs\(\.\{0,2}\|\~\)\/[^ \t\n\
 
 " Log Levels (case-insensitive)
 syn case ignore
-syn keyword VVLogLvFatal      FATAL
+syn keyword VVLogLvFatal      FATAL PANIC
 syn keyword VVLogLvEmergency  EMERG EMERGENCY
 syn keyword VVLogLvAlert      ALERT
 syn keyword VVLogLvCritical   CRIT CRITICAL
@@ -66,7 +66,7 @@ syn keyword VVLogLvDebug      DEBUG DBG
 syn keyword VVLogLvTrace      TRACE
 syn keyword VVLogLvVerbose    VERBOSE
 syn keyword VVLogLvPass       PASS PASSED
-syn keyword VVLogLvSuccess    SUCCESS DONE OK
+syn keyword VVLogLvSuccess    SUCCESS DONE OK COMPLETE FINISHED
 
 " Composite log levels e.g. *_INFO
 syn match VVLogLvFatal        display '\<\w\+_FATAL\>'

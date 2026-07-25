@@ -1,7 +1,7 @@
 <div align="center">
   <h1>vv-log-hl.nvim</h1>
   <p>English | <a href="./README.zh-CN.md">中文</a></p>
-  <img src="./docs/assets/vv-log-hl.png" alt="vv-log-hl demo" width="900" />
+  <img src="https://github.com/beixiyo/vv-log-hl.nvim/releases/download/assets-2026-07-25/vv-log-hl.png" alt="vv-log-hl demo" width="900" />
   <p>Want my Neovim config? See <a href="https://github.com/beixiyo/dotfiles">dotfiles</a></p>
   <em>Syntax highlighting for log files with colored level keywords and rounded badge decorations</em>
   <p>

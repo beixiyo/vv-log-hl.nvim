@@ -1,7 +1,7 @@
 <div align="center">
   <h1>vv-log-hl.nvim</h1>
   <p><a href="./README.md">English</a> | 中文</p>
-  <img src="./docs/assets/vv-log-hl.png" alt="vv-log-hl 演示" width="900" />
+  <img src="https://github.com/beixiyo/vv-log-hl.nvim/releases/download/assets-2026-07-25/vv-log-hl.png" alt="vv-log-hl 演示" width="900" />
   <p>想要我的 Neovim 配置？查看 <a href="https://github.com/beixiyo/dotfiles">dotfiles</a></p>
   <em>日志文件语法高亮 — 等级关键词着色 + 圆角 badge 装饰</em>
   <p>

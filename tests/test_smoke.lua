@@ -213,6 +213,19 @@ test('#67 VVLogHlToggle 两次对已打开 buffer 可逆', function()
   vim.api.nvim_buf_delete(buf, { force = true })
 end)
 
+test('重复 setup 会应用新的 badge 配置', function()
+  local buf = make_log_buf()
+  assert(badge_count(buf) > 0, 'precondition: badge 存在')
+
+  hl.setup({ badge = false })
+  eq(badge_count(buf), 0, 'badge=false 应清除已有 badge')
+
+  hl.setup({ badge = true })
+  assert(badge_count(buf) > 0, 'badge=true 应重新装饰已打开的 log buffer')
+
+  vim.api.nvim_buf_delete(buf, { force = true })
+end)
+
 test('#68 重复 attach 幂等：单次编辑只触发一次 on_lines（不累积回调）', function()
   local badge = require('vv-log-hl.badge')
   local buf = make_log_buf()  -- 已 attach 一次

@@ -1,25 +1,22 @@
---- log-highlight — 日志文件语法高亮
---- 基于 vim syntax，支持自定义关键词扩展与文件检测
+-- Public facade: configuration, filetype registration and lifecycle commands.
+
+local Lifecycle = require('vv-log-hl.lifecycle')
+local Syntax = require('vv-log-hl.syntax')
 
 local M = {}
 
-local ft = 'log'
-local config
-local rtp_added = false
-local enabled = false
-local color_group = 'VVLogHighlightColors'
-local badge_group = 'VVLogHighlightBadge'
+local LOG_FILETYPE = 'log'
 
 ---@class VVLogHlConfig
 ---@field extension? string|string[] @default 'log'
 ---@field filename? string|string[] @default {}
 ---@field pattern? string|string[] @default {}
 ---@field keyword? table<string, string|string[]> @default { error = {}, warning = {}, info = {}, debug = {}, pass = {} }
----@field badge? boolean 是否启用圆角 badge 效果 @default true
+---@field badge? boolean @default true
 
 ---@type VVLogHlConfig
 local defaults = {
-  extension = ft,
+  extension = LOG_FILETYPE,
   filename = {},
   pattern = {},
   badge = true,
@@ -32,196 +29,66 @@ local defaults = {
   },
 }
 
-local hl_group_map = {
-  error = 'VVLogLvError',
-  warning = 'VVLogLvWarning',
-  info = 'VVLogLvInfo',
-  debug = 'VVLogLvDebug',
-  pass = 'VVLogLvPass',
-}
+local config = vim.deepcopy(defaults)
 
---- 将 string|string[] 转为 filetype table
----@param values string|string[]|nil
----@return table
-local function to_ft_table(values)
+---@param values? string|string[]
+---@return table<string, string>
+local function filetypes(values)
   if not values then return {} end
+  if type(values) == 'string' then return { [values] = LOG_FILETYPE } end
 
-  if type(values) == 'string' then
-    return { [values] = ft }
+  local result = {}
+  for _, value in ipairs(values) do
+    result[value] = LOG_FILETYPE
   end
-
-  local t = {}
-  for _, v in ipairs(values) do
-    t[v] = ft
-  end
-  return t
+  return result
 end
 
-local level_colors = {
-  fatal     = '#f7768e',
-  emergency = '#f7768e',
-  alert     = '#f7768e',
-  critical  = '#f7768e',
-  error     = '#db4b4b',
-  fail      = '#db4b4b',
-  warning   = '#e0af68',
-  notice    = '#ff9e64',
-  info      = '#7aa2f7',
-  debug     = '#636d83',
-  trace     = '#636d83',
-  verbose   = '#636d83',
-  pass      = '#9ece6a',
-  success   = '#9ece6a',
-}
-
-local syntax_colors = {
-  VVLogDate          = { fg = '#e0af68' },
-  VVLogWeekdayStr    = { fg = '#e0af68' },
-  VVLogTime          = { fg = '#ff9e64' },
-  VVLogTimeAMPM      = { fg = '#ff9e64' },
-  VVLogTimeZone      = { fg = '#ff9e64' },
-  VVLogDuration      = { fg = '#ff9e64' },
-  VVLogNumber         = { fg = '#d19a66' },
-  VVLogNumberFloat    = { fg = '#d19a66' },
-  VVLogNumberHex      = { fg = '#d19a66' },
-  VVLogString         = { fg = '#98c379' },
-  VVLogBool           = { fg = '#d19a66' },
-  VVLogNull           = { fg = '#d19a66' },
-  VVLogUrl            = { fg = '#7aa2f7', underline = true },
-  VVLogIPv4           = { fg = '#bb9af7' },
-  VVLogUUID           = { fg = '#bb9af7' },
-  VVLogPath           = { fg = '#7aa2f7' },
-  VVLogSymbol         = { fg = '#636d83' },
-  VVLogSeparatorLine  = { fg = '#636d83' },
-}
-
-local function build_highlights(use_badge)
-  local hls = vim.deepcopy(syntax_colors)
-  for level, color in pairs(level_colors) do
-    local name = 'VVLogLv' .. level:sub(1, 1):upper() .. level:sub(2)
-    local is_dim = (level == 'debug' or level == 'trace' or level == 'verbose')
-    if use_badge then
-      hls[name] = is_dim
-        and { fg = color, bg = '#292e42' }
-        or  { fg = '#ffffff', bg = color, bold = true }
-    else
-      hls[name] = is_dim
-        and { fg = color }
-        or  { fg = color, bold = true }
-    end
-  end
-  if use_badge then
-    hls.VVLogCapFatal   = { fg = level_colors.fatal }
-    hls.VVLogCapError   = { fg = level_colors.error }
-    hls.VVLogCapWarning = { fg = level_colors.warning }
-    hls.VVLogCapNotice  = { fg = level_colors.notice }
-    hls.VVLogCapInfo    = { fg = level_colors.info }
-    hls.VVLogCapDebug   = { fg = '#292e42' }
-    hls.VVLogCapPass    = { fg = level_colors.pass }
-  end
-  return hls
-end
-
-local function apply_highlights()
-  for name, hl in pairs(build_highlights(config.badge)) do
-    vim.api.nvim_set_hl(0, name, hl)
-  end
-end
-
---- 还原（清空）本插件定义的全部高亮组，使 syntax 着色随 disable 一并消失。
---- 用 badge=true 版求并集（其高亮组是非 badge 版的超集），与当前 config.badge 无关。
-local function clear_highlights()
-  for name in pairs(build_highlights(true)) do
-    vim.api.nvim_set_hl(0, name, {})
-  end
-end
-
---- 生成 after/syntax/log.vim 扩展自定义关键词
----@param keyword_table table<string, string|string[]>
-local function gen_syntax_file(keyword_table)
-  local syntax_dir = vim.fn.stdpath('data') .. '/log-highlight/after/syntax'
-  local file_path = syntax_dir .. '/log.vim'
-  local content = {}
-
-  for level, words in pairs(keyword_table) do
-    local str = nil
-
-    if type(words) == 'string' then
-      str = words
-    elseif type(words) == 'table' and not vim.tbl_isempty(words) then
-      str = table.concat(words, ' ')
-    end
-
-    if hl_group_map[level] and str then
-      content[#content + 1] = 'syn keyword ' .. hl_group_map[level] .. ' ' .. str .. '\n'
-    end
-  end
-
-  if vim.tbl_isempty(content) then
-    if vim.fn.filewritable(file_path) == 1 then
-      vim.fn.delete(file_path)
-    end
-    return
-  end
-
-  vim.fn.mkdir(syntax_dir, 'p')
-
-  local file = io.open(file_path, 'w')
-  if not file then return end
-  file:write(table.concat(content))
-  file:close()
-
-  if not rtp_added then
-    vim.opt.runtimepath:append(vim.fn.stdpath('data') .. '/log-highlight/after')
-    rtp_added = true
-  end
-end
-
-function M.enable()
-  if enabled then return end
-  enabled = true
-
-  apply_highlights()
-  vim.api.nvim_create_autocmd('ColorScheme', {
-    group = vim.api.nvim_create_augroup(color_group, { clear = true }),
-    callback = apply_highlights,
+local function register_filetypes()
+  vim.filetype.add({
+    extension = filetypes(config.extension),
+    filename = filetypes(config.filename),
+    pattern = filetypes(config.pattern),
   })
+end
 
-  if config.badge then
-    local badge = require('vv-log-hl.badge')
-    vim.api.nvim_create_autocmd('FileType', {
-      pattern = ft,
-      group = vim.api.nvim_create_augroup(badge_group, { clear = true }),
-      callback = function(ev)
-        badge.attach(ev.buf)
-      end,
-    })
+local function register_commands()
+  local commands = {
+    VVLogHlEnable = M.enable,
+    VVLogHlDisable = M.disable,
+    VVLogHlToggle = M.toggle,
+  }
 
-    -- 对「已经是 ft=log 且已加载」的 buffer 主动 attach：FileType 早已触发过、
-    -- 不会再触发，故 disable→enable / 二次 toggle 后须主动回放，badge 才能恢复
-    for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-      if vim.api.nvim_buf_is_loaded(buf) and vim.bo[buf].filetype == ft then
-        badge.attach(buf)
+  for name, callback in pairs(commands) do
+    vim.api.nvim_create_user_command(name, callback, { force = true })
+  end
+end
+
+local function detect_loaded_buffers()
+  for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+    local filetype = vim.bo[buf].filetype
+    if vim.api.nvim_buf_is_loaded(buf)
+        and filetype ~= LOG_FILETYPE
+        and filetype ~= 'bigfile'
+    then
+      local name = vim.api.nvim_buf_get_name(buf)
+      if name ~= '' and vim.filetype.match({ buf = buf, filename = name }) == LOG_FILETYPE then
+        vim.bo[buf].filetype = LOG_FILETYPE
       end
     end
   end
 end
 
+function M.enable()
+  Lifecycle.enable(config)
+end
+
 function M.disable()
-  if not enabled then return end
-  enabled = false
-
-  vim.api.nvim_create_augroup(color_group, { clear = true })
-  vim.api.nvim_create_augroup(badge_group, { clear = true })
-
-  -- 真正让高亮消失：1) 解除所有 log buffer 的 badge（清 extmark + 解绑 on_lines）；
-  -- 2) 清空高亮组定义，使 syntax 着色一并失色。enable 时 apply_highlights 再恢复。
-  require('vv-log-hl.badge').detach_all()
-  clear_highlights()
+  Lifecycle.disable()
 end
 
 function M.toggle()
-  if enabled then
+  if Lifecycle.enabled() then
     M.disable()
   else
     M.enable()
@@ -230,37 +97,16 @@ end
 
 ---@param opts? VVLogHlConfig
 function M.setup(opts)
-  config = vim.tbl_deep_extend('force', defaults, opts or {})
+  if Lifecycle.enabled() then Lifecycle.disable() end
 
-  vim.filetype.add({
-    extension = to_ft_table(config.extension),
-    filename = to_ft_table(config.filename),
-    pattern = to_ft_table(config.pattern),
-  })
-
-  gen_syntax_file(config.keyword)
+  config = vim.tbl_deep_extend('force', vim.deepcopy(defaults), opts or {})
+  register_filetypes()
+  Syntax.generate(config.keyword)
+  register_commands()
   M.enable()
-
-  vim.api.nvim_create_user_command('VVLogHlEnable', function() M.enable() end, {})
-  vim.api.nvim_create_user_command('VVLogHlDisable', function() M.disable() end, {})
-  vim.api.nvim_create_user_command('VVLogHlToggle', function() M.toggle() end, {})
-
-  -- lazy load 时 filetype 检测已跑完，补刷已打开 buffer 的 filetype
-  for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-    -- 跳过 vv-utils.bigfile 已标记的大文件：不把它强提成 log，保住 bigfile 关掉的重开销特性
-    if vim.api.nvim_buf_is_loaded(buf) and vim.bo[buf].filetype ~= ft and vim.bo[buf].filetype ~= 'bigfile' then
-      local name = vim.api.nvim_buf_get_name(buf)
-      if name ~= '' then
-        local detected = vim.filetype.match({ buf = buf, filename = name })
-        if detected == ft then
-          vim.bo[buf].filetype = ft
-        end
-      end
-    end
-  end
+  detect_loaded_buffers()
 end
 
----获取当前配置（只读副本）
 ---@return VVLogHlConfig
 function M.get_config()
   return vim.deepcopy(config)

@@ -151,12 +151,15 @@ function M.attach(bufnr)
   })
 end
 
---- 解除单个 buffer 的 badge：清除 extmark，并令其 on_lines 在下次触发时自解绑
+--- 解除单个 buffer 的 badge：立即解除 on_lines，随后清除 extmark。
 ---@param bufnr? number
 function M.detach(bufnr)
   bufnr = bufnr or vim.api.nvim_get_current_buf()
   attached[bufnr] = nil
   if vim.api.nvim_buf_is_valid(bufnr) then
+    -- token guard 只能让回调在下一次编辑时自行退出；disable 必须没有这个
+    -- 延迟窗口，否则重新 enable 会在同一 buffer 上叠加监听器。
+    pcall(vim.api.nvim_buf_detach, bufnr)
     vim.api.nvim_buf_clear_namespace(bufnr, ns, 0, -1)
   end
 end

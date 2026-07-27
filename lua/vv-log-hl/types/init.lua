@@ -1,0 +1,6 @@
+---@class VVLogHl.Config
+---@field extension? string|string[] @default 'log'
+---@field filename? string|string[] @default {}
+---@field pattern? string|string[] @default {}
+---@field keyword? table<string, string|string[]> @default { error = {}, warning = {}, info = {}, debug = {}, pass = {} }
+---@field badge? boolean @default true

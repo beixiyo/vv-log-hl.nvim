@@ -19,7 +19,7 @@
 {
   'beixiyo/vv-log-hl.nvim',
   ft = 'log',
-  ---@type VVLogHlConfig
+  ---@type VVLogHl.Config
   opts = {
     extension = 'log',     -- Detect filetype by extension (string | string[])
     filename = {},          -- Detect by exact filename (string | string[])

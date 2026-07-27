@@ -8,7 +8,7 @@ local groups = {
   pass = 'VVLogLvPass',
 }
 
-local runtimepath_added = false
+local runtimepath_root = nil
 
 ---@param words string|string[]
 ---@return string?
@@ -21,9 +21,8 @@ end
 
 ---@param keywords table<string, string|string[]>
 function M.generate(keywords)
-  local root = vim.fn.stdpath('data') .. '/log-highlight/after'
-  local directory = root .. '/syntax'
-  local path = directory .. '/log.vim'
+  local root = vim.fn.stdpath('run') .. '/vv-log-hl/after'
+  local directory, path = root .. '/syntax', root .. '/syntax/log.vim'
   local lines = {}
 
   for level, words in pairs(keywords) do
@@ -34,7 +33,7 @@ function M.generate(keywords)
   end
 
   if vim.tbl_isempty(lines) then
-    if vim.fn.filewritable(path) == 1 then vim.fn.delete(path) end
+    M.clear()
     return
   end
 
@@ -45,9 +44,17 @@ function M.generate(keywords)
   file:write(table.concat(lines))
   file:close()
 
-  if not runtimepath_added then
+  if runtimepath_root ~= root then
     vim.opt.runtimepath:append(root)
-    runtimepath_added = true
+    runtimepath_root = root
+  end
+end
+
+function M.clear()
+  if runtimepath_root then
+    vim.opt.runtimepath:remove(runtimepath_root)
+    vim.fn.delete(runtimepath_root, 'rf')
+    runtimepath_root = nil
   end
 end
 

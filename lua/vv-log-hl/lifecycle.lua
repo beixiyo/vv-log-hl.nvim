@@ -24,7 +24,7 @@ function M.enabled()
   return enabled
 end
 
----@param config VVLogHlConfig
+---@param config VVLogHl.Config
 function M.enable(config)
   if enabled then return end
   enabled = true

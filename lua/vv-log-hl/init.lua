@@ -1,4 +1,5 @@
 -- Public facade: configuration, filetype registration and lifecycle commands.
+require('vv-log-hl.types')
 
 local Lifecycle = require('vv-log-hl.lifecycle')
 local Syntax = require('vv-log-hl.syntax')
@@ -7,14 +8,7 @@ local M = {}
 
 local LOG_FILETYPE = 'log'
 
----@class VVLogHlConfig
----@field extension? string|string[] @default 'log'
----@field filename? string|string[] @default {}
----@field pattern? string|string[] @default {}
----@field keyword? table<string, string|string[]> @default { error = {}, warning = {}, info = {}, debug = {}, pass = {} }
----@field badge? boolean @default true
-
----@type VVLogHlConfig
+---@type VVLogHl.Config
 local defaults = {
   extension = LOG_FILETYPE,
   filename = {},
@@ -85,6 +79,7 @@ end
 
 function M.disable()
   Lifecycle.disable()
+  Syntax.clear()
 end
 
 function M.toggle()
@@ -95,7 +90,7 @@ function M.toggle()
   end
 end
 
----@param opts? VVLogHlConfig
+---@param opts? VVLogHl.Config
 function M.setup(opts)
   if Lifecycle.enabled() then Lifecycle.disable() end
 
@@ -107,7 +102,7 @@ function M.setup(opts)
   detect_loaded_buffers()
 end
 
----@return VVLogHlConfig
+---@return VVLogHl.Config
 function M.get_config()
   return vim.deepcopy(config)
 end
